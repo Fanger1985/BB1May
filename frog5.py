@@ -13,10 +13,6 @@ esp32_base_url = "http://192.168.1.2/"
 environment_map = {}
 current_orientation = 0  # Track the robot's current orientation in degrees
 
-# Constants for movement correction
-DESIRED_STRAIGHT_ORIENTATION = 0  # Adjust based on initial setup
-ORIENTATION_CORRECTION_THRESHOLD = 5  # Degrees off from desired orientation to trigger correction
-
 # Async HTTP request function with improved error handling
 async def send_http_get(endpoint):
     url = f"{esp32_base_url}{endpoint}"
@@ -39,23 +35,6 @@ async def send_http_get(endpoint):
 async def control_robot(command):
     result = await send_http_get(command)
     logging.info(f"Command '{command}' sent, response: {result}")
-    update_orientation_after_command(command)
-
-# Update orientation based on the command executed
-def update_orientation_after_command(command):
-    global current_orientation
-    if command == "left":
-        current_orientation = (current_orientation + 90) % 360
-    elif command == "right":
-        current_orientation = (current_orientation - 90) % 360
-
-# Function to check and correct orientation if necessary
-async def check_and_correct_orientation():
-    if abs(current_orientation - DESIRED_STRAIGHT_ORIENTATION) > ORIENTATION_CORRECTION_THRESHOLD:
-        if current_orientation > DESIRED_STRAIGHT_ORIENTATION:
-            await control_robot("left")
-        else:
-            await control_robot("right")
 
 # Fetch sensor and gyroscope data
 async def get_robot_data():
@@ -63,13 +42,15 @@ async def get_robot_data():
     gyro_data = await send_http_get("gyro")
     return sensor_data, gyro_data
 
-# Obstacle reaction based on sensor data, taking into account all sensors
+# Obstacle reaction based on sensor data
 async def react_to_obstacle(sensor_data):
     front_distance = sensor_data.get("distance", 100)
     if front_distance < 30:
+        logging.info("Obstacle detected! Stopping.")
         await control_robot("stop")
         await asyncio.sleep(1)
-        await control_robot("left" if math.sin(math.radians(current_orientation)) >= 0 else "right")
+        # Decision based on simplistic rule, modify as needed:
+        await control_robot("left")
         await asyncio.sleep(1)
         await control_robot("stop")
 
@@ -78,22 +59,22 @@ async def monitor_environment():
     try:
         while True:
             sensor_data, gyro_data = await get_robot_data()
-            update_orientation_from_gyro(gyro_data)
-            current_position = gyro_data.get("position", {})
+            current_position = process_gyro_data(gyro_data)  # Process and use gyro data to update position
             environment_map[current_position] = sensor_data
             await react_to_obstacle(sensor_data)
-            await check_and_correct_orientation()
             await asyncio.sleep(1)
     except asyncio.CancelledError:
         logging.info("Monitoring task was cancelled.")
         raise
 
-# Update current orientation from gyro data
-def update_orientation_from_gyro(gyro_data):
-    global current_orientation
-    # Assuming 'gz' is the angular rate around the Z-axis in degrees per second
-    gz = gyro_data.get("gz", 0)
-    current_orientation += gz * 0.05  # Assume update rate of 20 Hz (0.05 seconds per update)
+# Process gyro data to update current position
+def process_gyro_data(gyro_data):
+    # Example processing logic, adjust based on actual data structure
+    gx, gy, gz = gyro_data.get("gx", 0), gyro_data.get("gy", 0), gyro_data.get("gz", 0)
+    # Here you could integrate this data over time to estimate orientation, or directly use values
+    logging.info(f"Gyro Data - gx: {gx}, gy: {gy}, gz: {gz}")
+    # Assuming 'gz' updates current orientation in degrees (this is simplistic and may need actual integration logic)
+    return {"x": gx, "y": gy, "z": gz}  # Returning as position for the sake of example
 
 # Main routine to handle async tasks
 async def main():

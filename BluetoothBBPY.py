@@ -2,6 +2,7 @@ import bluetooth
 import asyncio
 import logging
 import random
+import subprocess
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,6 +16,20 @@ behavior_scores = {
     'stop': 0
 }
 
+def setup_bluetooth():
+    # Check if ESP32 is already paired and connected
+    paired_devices = subprocess.run(['bluetoothctl', 'paired-devices'], capture_output=True, text=True)
+    if esp32_bt_address not in paired_devices.stdout:
+        # Pairing process
+        subprocess.run(['bluetoothctl', 'power', 'on'])
+        subprocess.run(['bluetoothctl', 'agent', 'on'])
+        subprocess.run(['bluetoothctl', 'scan', 'on'])
+        subprocess.run(['bluetoothctl', 'pair', esp32_bt_address])
+        subprocess.run(['bluetoothctl', 'trust', esp32_bt_address])
+        subprocess.run(['bluetoothctl', 'connect', esp32_bt_address])
+    else:
+        logging.info("ESP32 is already paired.")
+
 async def send_bt_command(command, retries=3):
     attempt = 0
     while attempt < retries:
@@ -25,12 +40,13 @@ async def send_bt_command(command, retries=3):
             response = sock.recv(1024).decode('utf-8')  # Adjust buffer size as needed
             sock.close()
             return response
-        except Exception as e:
-            logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
+        except bluetooth.btcommon.BluetoothError as bt_error:
+            logging.error(f"Bluetooth Error on attempt {attempt + 1}: {bt_error}")
             attempt += 1
-            if attempt == retries:
-                return None
-        await asyncio.sleep(1)  # Wait a second before retrying
+            await asyncio.sleep(1)  # Retry interval
+        except Exception as e:
+            logging.error(f"Unexpected error on attempt {attempt + 1}: {str(e)}")
+            return None
 
 async def control_robot(command):
     response = await send_bt_command(command)
@@ -44,7 +60,6 @@ def update_behavior_score(command, response):
         behavior_scores[command] -= 1
 
 async def choose_best_action():
-    # Avoid actions with negative scores if possible
     best_action = max(behavior_scores, key=behavior_scores.get)
     return best_action if behavior_scores[best_action] > 0 else 'stop'
 
@@ -93,9 +108,9 @@ async def idle_behavior():
         await control_robot("stop")
 
 async def main():
+    setup_bluetooth()
     logging.info("Starting enhanced robot behavior script with adaptive learning")
     asyncio.create_task(monitor_environment())
-    # Example of other behaviors
     await asyncio.gather(
         idle_behavior(),
         dance_routine()

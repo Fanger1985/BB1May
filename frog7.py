@@ -12,7 +12,7 @@ import pigpio
 logging.basicConfig(level=logging.INFO)
 
 # Robot's base URL
-esp32_base_url = "http://192.168.4.1/"
+esp32_base_url = "http://192.168.1.2/"
 
 # Environment map to track visited positions and observed obstacles
 environment_map = {}

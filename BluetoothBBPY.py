@@ -6,7 +6,7 @@ import random
 logging.basicConfig(level=logging.INFO)
 
 # Correct Bluetooth address of the ESP32
-esp32_bt_address = "F896:AF67B4FC"  # Replace with your actual ESP32's Bluetooth address
+esp32_bt_address = "F8:96:AF:67:B4:FC"  # Replace with your actual ESP32's Bluetooth address
 
 behavior_scores = {
     'forward': 0,
@@ -16,24 +16,21 @@ behavior_scores = {
 }
 
 async def send_bt_command(command, retries=3):
-    sock = None
     attempt = 0
     while attempt < retries:
         try:
             sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            sock.connect((esp32_bt_address, 1))
+            sock.connect((esp32_bt_address, 1))  # RFCOMM port 1
             sock.send(command + "\n")
-            response = sock.recv(1024).decode('utf-8')
+            response = sock.recv(1024).decode('utf-8')  # Adjust buffer size as needed
+            sock.close()
             return response
         except Exception as e:
             logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             attempt += 1
-        finally:
-            if sock is not None:
-                sock.close()
+            if attempt == retries:
+                return None
         await asyncio.sleep(1)  # Wait a second before retrying
-    return None
-
 
 async def control_robot(command):
     response = await send_bt_command(command)
@@ -41,9 +38,9 @@ async def control_robot(command):
     return response
 
 def update_behavior_score(command, response):
-    if response and 'success' in response:
+    if 'success' in response:
         behavior_scores[command] += 1
-    elif response and 'failure' in response:
+    elif 'failure' in response:
         behavior_scores[command] -= 1
 
 async def choose_best_action():
@@ -97,9 +94,8 @@ async def idle_behavior():
 
 async def main():
     logging.info("Starting enhanced robot behavior script with adaptive learning")
-    await asyncio.sleep(5)  # Give some time for everything to initialize
-    await send_bt_command("move forward")  # Test direct command
     asyncio.create_task(monitor_environment())
+    # Example of other behaviors
     await asyncio.gather(
         idle_behavior(),
         dance_routine()
@@ -107,5 +103,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 

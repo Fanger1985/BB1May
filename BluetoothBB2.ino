@@ -85,7 +85,8 @@ void loop() {
             handleCommand(pMotorControlCharacteristic->getValue().c_str());
             pMotorControlCharacteristic->setValue("");
         }
-        // Add autonomous behavior and sensor updates here if needed
+        // Regularly update and report sensor status
+        updateSensors();
     }
 
     if (!NimBLEDevice::getServer()->getConnectedCount() && oldDeviceConnected) {
@@ -98,6 +99,28 @@ void loop() {
         Serial.println("New client connected.");
         oldDeviceConnected = true;
     }
+}
+
+void updateSensors() {
+    // Read and report gyroscope and accelerometer data
+    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    Serial.print("Gyro (X, Y, Z): ");
+    Serial.print(gx); Serial.print(", ");
+    Serial.print(gy); Serial.print(", ");
+    Serial.print(gz); Serial.print(" | Accel (X, Y, Z): ");
+    Serial.print(ax); Serial.print(", ");
+    Serial.print(ay); Serial.print(", ");
+    Serial.println(az);
+
+    // Read and report IR sensor status
+    int irLeftStatus = digitalRead(IR_LEFT);
+    int irRightStatus = digitalRead(IR_RIGHT);
+    Serial.print("IR Left: "); Serial.print(irLeftStatus);
+    Serial.print(" | IR Right: "); Serial.println(irRightStatus);
+
+    // Measure and report ultrasonic distance
+    int distance = getUltrasonicDistance();
+    Serial.print("Ultrasonic Distance: "); Serial.println(distance);
 }
 
 void handleCommand(String command) {
@@ -165,6 +188,5 @@ int getUltrasonicDistance() {
     digitalWrite(TRIG_PIN, LOW);
     long duration = pulseIn(ECHO_PIN, HIGH);
     int distance = duration * 0.034 / 2;
-    Serial.println("Ultrasonic distance measured: " + String(distance) + " cm");
     return distance;
 }

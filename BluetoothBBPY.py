@@ -7,7 +7,7 @@ import subprocess
 logging.basicConfig(level=logging.INFO)
 
 # Correct Bluetooth address of the ESP32
-esp32_bt_address = "FC:B4:67:AF:96:FA"  # Replace with your actual ESP32's Bluetooth address
+esp32_bt_address = "FC:B4:67:AF:96:FA"  # th
 
 behavior_scores = {
     'forward': 0,
@@ -33,20 +33,20 @@ def setup_bluetooth():
 async def send_bt_command(command, retries=3):
     attempt = 0
     while attempt < retries:
-        sock = None
         try:
             sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             sock.connect((esp32_bt_address, 1))  # RFCOMM port 1
-            sock.sendall((command + "\n").encode('utf-8'))
-            response = sock.recv(1024).decode('utf-8')
+            sock.send(command + "\n")
+            response = sock.recv(1024).decode('utf-8')  # Adjust buffer size as needed
+            sock.close()
             return response
         except bluetooth.btcommon.BluetoothError as bt_error:
             logging.error(f"Bluetooth Error on attempt {attempt + 1}: {bt_error}")
             attempt += 1
-            await asyncio.sleep(1)
-        finally:
-            if sock:
-                sock.close()
+            await asyncio.sleep(1)  # Retry interval
+        except Exception as e:
+            logging.error(f"Unexpected error on attempt {attempt + 1}: {str(e)}")
+            return None
 
 async def control_robot(command):
     response = await send_bt_command(command)
@@ -118,4 +118,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

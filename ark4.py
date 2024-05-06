@@ -22,14 +22,23 @@ async def send_http_get(session, endpoint):
     try:
         async with session.get(esp32_base_url + endpoint) as response:
             if response.status == 200:
-                print(f"GET request to {endpoint} succeeded")
-                return await response.json()
+                contentType = response.headers.get('Content-Type')
+                if 'application/json' in contentType:
+                    print(f"GET request to {endpoint} succeeded with JSON")
+                    return await response.json()
+                elif 'text/plain' in contentType:
+                    text = await response.text()
+                    print(f"GET request to {endpoint} succeeded with text: {text}")
+                    return {"status": "success", "message": text}
+                else:
+                    print(f"Unexpected content type: {contentType}")
             else:
                 print(f"GET request to {endpoint} failed with status {response.status}")
-                return None
+            return None
     except aiohttp.ClientError as e:
         print(f"HTTP request to {endpoint} threw an error: {e}")
         return None
+
 
 async def get_state_from_sensors(session):
     """Fetch sensor data from ESP32 and compute the current state."""

@@ -251,16 +251,16 @@ def get_color_proximity():
 def start_face_tracking():
     """Starts a separate thread for tracking faces using the webcam."""
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    cap = cv2.VideoCapture(0)
-
+    
     def tracking():
         global home_base_location
+        camera = CameraManager()  # Use a separate instance or share one if possible
         try:
             while True:
-                ret, frame = cap.read()
-                if not ret:
+                frame = camera.capture_frame()
+                if frame is None:
                     break
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
                 faces = face_cascade.detectMultiScale(gray, 1.1, 4)
                 if len(faces) > 0 and home_base_location is None:
                     home_base_location = {"x": faces[0][0], "y": faces[0][1]}
@@ -268,9 +268,10 @@ def start_face_tracking():
         except Exception as e:
             logging.error(f"Face tracking error: {str(e)}")
         finally:
-            cap.release()
+            camera.release()
 
     threading.Thread(target=tracking, daemon=True).start()
+
 
 async def navigate_to_home_base(session):
     """Navigates the robot back to the home base location using learned Q-values."""

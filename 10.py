@@ -185,27 +185,21 @@ async def send_http_get(session, endpoint):
         logging.error(f"Error during HTTP GET to {endpoint}: {str(e)}")
         return None
 
-async def get_ultrasonic_distance(session):
-    """Fetches ultrasonic distance from the ESP32."""
-    try:
-        response = await send_http_get(session, "ultrasonic_distance")
-        if response:
-            return int(response.get('distance', 0))
-    except Exception as e:
-        logging.error(f"Failed to fetch ultrasonic distance: {str(e)}")
-    return None
-
 async def get_state_from_sensors(session):
     """Retrieves sensor data from ESP32 and calculates the current state index."""
     response = await send_http_get(session, "sensors")
     if response:
-        distance = response.get('distance', 100)
+        distance = response.get('distance', 100)  # Assuming 'distance' key holds ultrasonic data
         ir_left = response.get('ir_left', 0)
         ir_right = response.get('ir_right', 0)
         distance_state = min(int(distance / 10), num_distance_states - 1)
         ir_state = 1 if ir_left > 0 or ir_right > 0 else 0
-        return distance_state + (num_distance_states * ir_state)
+        current_state_index = distance_state + (num_distance_states * ir_state)
+        logging.debug(f"Current Sensor State - Distance: {distance}mm, IR Left: {ir_left}, IR Right: {ir_right}, State Index: {current_state_index}")
+        return current_state_index
     return 0  # Default state if no data
+
+# Since we now handle ultrasonic distance inside get_state_from_sensors, you might not need a separate get_ultrasonic_distance function unless required elsewhere.
 
 def get_distance():
     """Get distance from VL53L4CD."""
@@ -231,12 +225,12 @@ def get_color_proximity():
     """Get color and proximity data from APDS9960."""
     try:
         r, g, b, c = apds_sensor.color_data
-        proximity = apds_sensor.proximity()
-        logging.debug(f"Proximity reading: {proximity}")  # Add debug log for proximity
+        proximity = apds_sensor.proximity()  # Make sure this is not being called as proximity()
+        logging.debug(f"Color and Proximity - Red: {r}, Green: {g}, Blue: {b}, Clear: {c}, Proximity: {proximity}")
         return (r, g, b, c), proximity
     except Exception as e:
         logging.error(f"Error getting color or proximity: {str(e)}")
-        return None, None
+        return (None, None, None, None), None
 
 
 def start_face_tracking():

@@ -209,11 +209,11 @@ async def get_state_from_sensors(session):
 async def get_ultrasonic_distance(session):
     """Fetches ultrasonic distance from the ESP32."""
     try:
-        response = await send_http_get(session, "ultrasonic_distance")
+        response = await send_http_get(session, "sensors")  # Changed endpoint to 'sensors'
         if response:
             return int(response.get('distance', 0))
     except Exception as e:
-        logging.error(f"Failed to fetch ultrasonic distance: {str(e)}")
+        logging.error(f"Failed to fetch sensors data: {str(e)}")
     return None
 
 def get_distance():

@@ -81,10 +81,16 @@ apds_sensor.enable_proximity = True
 apds_sensor.enable_color = True
 
 class CameraManager:
-    def __init__(self):
-        self.cap = cv2.VideoCapture(0)
-        if not self.cap.isOpened():
-            logging.error("Cannot open the camera.")
+    def __init__(self, retries=3, delay=1):
+        self.cap = None
+        for i in range(retries):
+            self.cap = cv2.VideoCapture(0)
+            if self.cap.isOpened():
+                break
+            logging.error(f"Attempt {i + 1}: Cannot open the camera, retrying...")
+            time.sleep(delay)
+        if not self.cap or not self.cap.isOpened():
+            logging.error("Failed to open the camera after several attempts.")
             self.cap = None
 
     def capture_frame(self):
@@ -101,6 +107,7 @@ class CameraManager:
     def release(self):
         if self.cap:
             self.cap.release()
+
 
 camera_manager = CameraManager()
 

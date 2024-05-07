@@ -152,6 +152,31 @@ async def send_http_get(session, endpoint):
         logging.error(f"Error during HTTP GET to {endpoint}: {str(e)}")
         return None
 
+def start_face_tracking():
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    cap = cv2.VideoCapture(0)  # Assuming your webcam index is 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            logging.error("Failed to capture video frame")
+            break
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
+
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            logging.info(f"Face detected at x:{x}, y:{y}, w:{w}, h:{h}")
+
+        # Display the resulting frame (optional, remove if running headless)
+        cv2.imshow('Face Tracking', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
 async def get_state_from_sensors(session):
     distance, r, g, b, c = read_sensors()
     distance_state = min(int(distance / 10), num_distance_states - 1)
@@ -244,3 +269,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

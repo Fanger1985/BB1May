@@ -214,6 +214,13 @@ def get_distance():
     except Exception as e:
         logging.error(f"Error getting distance: {str(e)}")
         return None
+
+async def continually_update_tof():
+    while True:
+        distance = get_distance()
+        if distance:
+            logging.info(f"Current TOF Distance: {distance}mm")
+        await asyncio.sleep(0.1)  # Update every 100ms
     
 def check_proximity():
     """Check proximity data from APDS9960 and return it."""
@@ -274,11 +281,13 @@ async def enhanced_exploration(session):
         proximity = check_proximity()
         ultrasonic_distance = await get_ultrasonic_distance(session)
 
+        logging.debug(f"Exploration Readings - TOF: {tof_distance}mm, Proximity: {proximity}, Ultrasonic: {ultrasonic_distance}mm")
+
         if (tof_distance is not None and tof_distance < 500) or \
            (proximity is not None and proximity > 200) or \
            (ultrasonic_distance is not None and ultrasonic_distance < 400):
             await send_http_get(session, 'backward')
-            logging.info(f"Obstacle detected, moving backward. TOF: {tof_distance}mm, Proximity: {proximity}, Ultrasonic: {ultrasonic_distance}mm")
+            logging.info(f"Obstacle detected, moving backward.")
         else:
             await send_http_get(session, 'forward')
             logging.info("Path clear, moving forward.")

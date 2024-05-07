@@ -16,9 +16,9 @@ from adafruit_apds9960.apds9960 import APDS9960
 from adafruit_vl53l4cd import VL53L4CD
 
 # Load pre-trained model and set up OpenCV for dog detection
-model_path = 'frozen_inference_graph.pb'
-config_path = 'ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
-net = cv2.dnn.readNetFromTensorflow(model_path, config_path)
+# model_path = 'frozen_inference_graph.pb'
+# config_path = 'ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
+# net = cv2.dnn.readNetFromTensorflow(model_path, config_path)
 
 # Setup basic logging
 log_formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s')
@@ -207,26 +207,20 @@ def wiggle_servos():
 husky_index = 252  # As identified for Siberian Husky
 toilet_tissue_index = 1001  # Index for toilet tissue
 
-# Your imports and setup are correct; make sure you define this function:
 def recognize_object(frame, husky_index, toilet_tissue_index):
-    input_tensor = np.expand_dims(frame, axis=0)  # Add batch dimension
-    input_tensor = input_tensor.astype(np.float32)  # Ensure correct data type
+    input_tensor = np.expand_dims(frame, axis=0)
+    input_tensor = input_tensor.astype(np.float32)
     interpreter.set_tensor(input_details[0]['index'], input_tensor)
     interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])[0]  # Extract output from batch
-    
+    output_data = interpreter.get_tensor(output_details[0]['index'])[0]
+
     recognized_husky = np.argmax(output_data) == husky_index
     recognized_toilet_tissue = np.argmax(output_data) == toilet_tissue_index
 
-    if recognized_husky:
-        logging.info("Siberian Husky detected!")
+    if recognized_husky or recognized_toilet_tissue:
+        logging.info("Object detected!")
         return True
-    elif recognized_toilet_tissue:
-        logging.info("Toilet tissue detected!")
-        return True
-
     return False
-
 
 def dramatic_wiggle_servos():
     # A more dramatic sequence of movements for when an animal is spotted

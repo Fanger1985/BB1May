@@ -156,26 +156,33 @@ def start_face_tracking():
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     cap = cv2.VideoCapture(0)  # Assuming your webcam index is 0
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            logging.error("Failed to capture video frame")
-            break
+    if not cap.isOpened():
+        logging.error("Cannot open the camera.")
+        return  # Exit the function if camera can't be accessed
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                logging.error("Failed to capture video frame")
+                break
 
-        for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            logging.info(f"Face detected at x:{x}, y:{y}, w:{w}, h:{h}")
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
 
-        # Display the resulting frame (optional, remove if running headless)
-        cv2.imshow('Face Tracking', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            for (x, y, w, h) in faces:
+                logging.info(f"Face detected at x:{x}, y:{y}, w:{w}, h:{h}")
+                # Optionally draw the rectangle around the face in the frame
+                # cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            
+            # If you need to show the frame, remove comments below (not recommended for headless)
+            # cv2.imshow('Face Tracking', frame)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
+    finally:
+        cap.release()
+        # cv2.destroyAllWindows()  # No need to call this on a headless system
 
-    cap.release()
-    cv2.destroyAllWindows()
 
 async def get_state_from_sensors(session):
     distance, r, g, b, c = read_sensors()
@@ -265,7 +272,7 @@ async def robot_behavior(session):
 async def main():
     async with aiohttp.ClientSession() as session:
         threading.Thread(target=start_face_tracking).start()
-        await asyncio.gather(robot_behavior(session), enhanced_exploration(session))
+        await robot_behavior(session)  # Only run robot_behavior if enhanced_exploration is not defined
 
 if __name__ == "__main__":
     asyncio.run(main())

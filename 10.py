@@ -272,21 +272,32 @@ async def enhanced_exploration(session):
     """Directs the robot to explore more aggressively towards open spaces, avoiding close obstacles."""
     while True:
         tof_distance = get_distance()
-        proximity = check_proximity()
         ultrasonic_distance = await get_ultrasonic_distance(session)
 
-        logging.debug(f"Exploration Readings - TOF: {tof_distance}mm, Proximity: {proximity}, Ultrasonic: {ultrasonic_distance}mm")
+        # Log current sensor readings for debugging and learning
+        logging.debug(f"Exploration Readings - TOF: {tof_distance}mm, Ultrasonic: {ultrasonic_distance}mm")
 
-        if (tof_distance is not None and tof_distance < 500) or \
-           (proximity is not None and proximity > 200) or \
-           (ultrasonic_distance is not None and ultrasonic_distance < 400):
+        # Decision making based on sensor data
+        if tof_distance is not None and tof_distance < 200:
             await send_http_get(session, 'backward')
-            logging.info(f"Obstacle detected, moving backward.")
+            logging.info("Close TOF obstacle detected, moving backward.")
+        elif ultrasonic_distance is not None and ultrasonic_distance < 400:
+            await send_http_get(session, 'backward')
+            logging.info("Close ultrasonic obstacle detected, moving backward.")
         else:
-            await send_http_get(session, 'forward')
-            logging.info("Path clear, moving forward.")
+            # If path is clear, decide to move forward or adjust path
+            action = determine_next_action()
+            await send_http_get(session, action)
+            logging.info(f"Path clear, moving {action}.")
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # Control the loop frequency
+
+def determine_next_action():
+    """Determine the next action based on the current state and learned Q-values."""
+    current_state = get_current_state()  # Assume function to fetch the current state index
+    action_index = np.argmax(Q[current_state])
+    return actions[action_index]
+
 
 # Assuming 'bottle' is the third class in your model output
 TARGET_INDEX_FOR_DOG = 2  # Change this to the actual index of 'dog' in your model output
@@ -322,47 +333,51 @@ def celebrate_with_dog():
 object_found = False
 
 async def robot_behavior(session):
-    """Main behavior loop for the robot, applying Q-learning for decision making."""
     global epsilon, object_found  # Ensure 'object_found' is known globally
     load_q_table()
 
     while True:
         distance = get_distance()
-        if distance and distance < 200:  # Stop if an obstacle is too close
+        ultrasonic_distance = await get_ultrasonic_distance(session)
+
+        if distance and distance < 200 or (ultrasonic_distance is not None and ultrasonic_distance < 200):
             await send_http_get(session, 'stop')
             logging.info(f"Stopped due to close obstacle at {distance}mm.")
-            continue
+            continue  # Remain in the loop but skip moving commands until clear
 
-        # Fetch both the hall sensor data and the current sensor state
-        left_hall, right_hall = await get_hall_sensor_data(session)
-        state = await get_state_from_sensors(session)
+        # If the obstacle is no longer detected, re-evaluate the situation
+        if distance >= 200 and (ultrasonic_distance is None or ultrasonic_distance >= 200):
+            logging.info("Path clear, reassessing movement strategy.")
+            left_hall, right_hall = await get_hall_sensor_data(session)
+            state = await get_state_from_sensors(session)
 
-        if not object_found:
-            frame = camera_manager.capture_frame()
-            if frame and recognize_object(frame, target_index=TARGET_INDEX_FOR_DOG):
-                logging.info("Dog spotted! Initiating approach...")
-                object_found = True
-                await navigate_to_object(session)
-            else:
-                logging.debug("Dog not found, continuing exploration.")
+            if not object_found:
+                frame = camera_manager.capture_frame()
+                if frame and recognize_object(frame, target_index=TARGET_INDEX_FOR_DOG):
+                    logging.info("Dog spotted! Initiating approach...")
+                    object_found = True
+                    await navigate_to_object(session)
+                else:
+                    logging.debug("Dog not found, continuing exploration.")
 
-        if not object_found:
-            action_index = np.argmax(Q[state]) if random.random() > epsilon else random.randint(0, len(actions) - 1)
-            action = actions[action_index]
-            await send_http_get(session, action)
-            new_state = await get_state_from_sensors(session)
-            reward = calculate_reward(state, new_state, action)
-            update_q_table(state, action_index, reward, new_state)
-            state = new_state
+            if not object_found:
+                action_index = np.argmax(Q[state]) if random.random() > epsilon else random.randint(0, len(actions) - 1)
+                action = actions[action_index]
+                await send_http_get(session, action)
+                new_state = await get_state_from_sensors(session)
+                reward = calculate_reward(state, new_state, action)
+                update_q_table(state, action_index, reward, new_state)
+                state = new_state
 
-            epsilon = max(epsilon_min, epsilon * epsilon_decay)
+                epsilon = max(epsilon_min, epsilon * epsilon_decay)
 
-            if random.random() < 0.05:
-                save_q_table()
-                logging.info("Q-table saved.")
+                if random.random() < 0.05:
+                    save_q_table()
+                    logging.info("Q-table saved.")
 
-        if random.random() < 0.1:
-            wiggle_servos()
+            if random.random() < 0.1:
+                wiggle_servos()
+
 
 async def navigate_to_object(session):
     """Navigate towards the dog and perform interaction."""

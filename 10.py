@@ -199,7 +199,15 @@ async def get_state_from_sensors(session):
         return current_state_index
     return 0  # Default state if no data
 
-# Since we now handle ultrasonic distance inside get_state_from_sensors, you might not need a separate get_ultrasonic_distance function unless required elsewhere.
+async def get_ultrasonic_distance(session):
+    """Fetches ultrasonic distance from the ESP32."""
+    try:
+        response = await send_http_get(session, "ultrasonic_distance")
+        if response:
+            return int(response.get('distance', 0))
+    except Exception as e:
+        logging.error(f"Failed to fetch ultrasonic distance: {str(e)}")
+    return None
 
 def get_distance():
     """Get distance from VL53L4CD."""
@@ -401,6 +409,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
